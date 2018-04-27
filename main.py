@@ -781,19 +781,19 @@ def junban(bot, update, args):
 
 
 def jbanlist(bot, update):
-    from_id = update.message.from_user.id
-    chat_id = update.message.chat.id
-    msgid = update.message.message_id
+    msg = update.message
+    from_id = msg.from_user.id
+    chat_id = msg.chat.id
+    msgid = msg.message_id
 
-    add(update.message)
+    add(msg)
     cursor = engine.connect().connection.cursor()
 
     bey = checkbanned(from_id)
     if bey == 1:
         return
-
-    if from_id != ADMIN_ID:
-        bot.sendMessage(chat_id, "You are not %s!" % ADMIN_NAME, reply_to_message_id=msgid)
+    elif from_id != ADMIN_ID:
+        msg.reply_text("You are not {}!".format(ADMIN_NAME), quote=True)
         return
 
     banlistsql = "select name, username, telegramid from user where banned=1"
@@ -802,11 +802,11 @@ def jbanlist(bot, update):
     result=cursor.fetchone()
     sqlmsg = "Banned users:\n"
     if not result:
-        sqlmsg  = "No banned users"
+        sqlmsg = "No banned users"
     while result:
-        sqlmsg+="`"+str(result)+"`\n"
-        result=cursor.fetchone()
-    bot.sendMessage(chat_id, sqlmsg, reply_to_message_id=msgid, parse_mode='Markdown')
+        sqlmsg += "`{}`\n".format(result)
+        result = cursor.fetchone()
+    msg.reply_markdown(sqlmsg, quote=True)
     cursor.close()
 
 
@@ -815,42 +815,36 @@ def nopm(bot, chat_id, from_name, msgid):
     keyboard = [[InlineKeyboardButton("Start Me!", callback_data = 'start')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    bot.sendMessage(chat_id, nopmmsg, reply_to_message_id=msgid, reply_markup=reply_markup)
+    bot.send_message(chat_id, nopmmsg, reply_to_message_id=msgid, reply_markup=reply_markup)
 
 
 def button(bot, update):
     query = update.callback_query
     queryid = query.id
-    query_from_id = query.from_user.id
-    query_from_first = query.from_user.first_name
-    query_from_last = query.from_user.last_name
-    if query_from_last is not None:
-        query_from_name = query_from_first + " " + query_from_last
-    else:
-        query_from_name = query_from_first
+    query_user = query.from_user
+    query_from_id = query_user.id
+    query_from_first = query_user.first_name
+    query_from_last = query_user.last_name
+    query_from_name = query_user.full_name
     msg = query.message
-    chat_id = msg.chat.id
+    chat_id = msg.chat_id
     msgid = msg.message_id
-    tomsg = query.message.reply_to_message
+    tomsg = msg.reply_to_message
 #    from_id = chat_data['from_id']
 
     if query.data == 'start':
         starturl="telegram.me/" + BOT_USERNAME + "?start=help"
-        bot.answerCallbackQuery(queryid, url = starturl)
+        bot.answer_callback_query(queryid, url = starturl)
 
     if query.data == 'achv':
         starturl="telegram.me/" + BOT_USERNAME + "?start=achv"
-        bot.answerCallbackQuery(queryid, url=starturl)
+        bot.answer_callback_query(queryid, url=starturl)
 
 
 def help(bot, update):
-    chat_type = update.message.chat.type
-    from_id = update.message.from_user.id
-    chat_id = update.message.chat.id
-    from_name = update.message.from_user.first_name
-    msgid = update.message.message_id
+    msg = update.message
 
-    add(update.message)
+    add(msg)
 
     bey = checkbanned(from_id)
     if bey == 1:
@@ -863,14 +857,10 @@ def help(bot, update):
     helpmsg += "`/now (<location>): return current weather for your already set location (or inputted location)`\n"
     helpmsg += "`/feedback <message>: send feedback to me!`\n"
     helpmsg += "`/t <text>: (or by reply), translate to english`"
-#    print(helpmsg)
-#    try:
-    bot.sendMessage(from_id, helpmsg, parse_mode='Markdown')
-    if chat_type != 'private':
-        bot.sendMessage(chat_id, "I've sent you the help message in private.", reply_to_message_id=msgid)
-#    except:
-#        if chat_type != 'private':
-#            nopm(bot, chat_id, from_name, msgid)
+    
+    msg.reply_markdown(helpmsg)
+    if msg.chat_id < 0:
+        msg.reply_markdown("I've sent you the help message in private.")
 
 
 def calc_callback(bot, update, args):
@@ -882,20 +872,21 @@ def calc_callback(bot, update, args):
         msg = "The answer is `{}`.".format(answer)
     except:
         msg = "Error occured. Try again."
-    update.message.reply_text(msg, parse_mode='Markdown')
+    update.message.reply_markdown(msg)
 
 
 def send(bot, update, args):
-    chat_type = update.message.chat.type
-    from_id = update.message.from_user.id
-    chat_id = update.message.chat.id
-    from_name = update.message.from_user.first_name
-    msgid = update.message.message_id
-    reply_to = update.message.reply_to_message
+    msg = update.message
+    chat_type = msg.chat.type
+    from_id = msg.from_user.id
+    chat_id = msg.chat.id
+    from_name = msg.from_user.first_name
+    msgid = msg.message_id
+    reply_to = msg.reply_to_message
     if reply_to:
         to_user_id = reply_to.from_user.id
 
-    add(update.message)
+    add(msg)
     cursor = engine.connect().connection.cursor()
 
     bey = checkbanned(from_id)
@@ -903,15 +894,15 @@ def send(bot, update, args):
         return
 
     if from_id != ADMIN_ID:
-        bot.sendMessage(chat_id, ("You are not %s!" % ADMIN_NAME), reply_to_message_id=msgid)
+        msg.reply_text("You are not %s!".format(ADMIN_NAME), quote=True)
         return
 
     if not reply_to:
         if not args:
-            bot.sendMessage(chat_id, "Use `/send <id> <message>`", reply_to_message_id=msgid, parse_mode='Markdown')
+            msg.reply_markdown("Use `/send <id> <message>`", quote=True)
             return
         if len(args) <= 1:
-            bot.sendMessage(chat_id, "Use `/send <id> <message>`", reply_to_message_id=msgid, parse_mode='Markdown')
+            msg.reply_markdown("Use `/send <id> <message>`", quote=True)
             return
         sendperson = args[0]
         args.pop(0)
@@ -920,13 +911,13 @@ def send(bot, update, args):
 
         if sendperson.isdigit():
             try:
-                bot.sendMessage(sendperson, sendmessage)
-                bot.sendMessage(chat_id, "Message sent", reply_to_message_id=msgid)
+                bot.send_message(sendperson, sendmessage)
+                msg.reply_text("Message sent", quote=True)
             except:
-                bot.sendMessage(chat_id, "Send Failed", reply_to_message_id=msgid)
+                msg.reply_text("Send Failed", quote=True)
         elif sendperson[1:].isdigit():
-                bot.sendMessage(sendperson, sendmessage)
-                bot.sendMessage(chat_id, "Message sent")
+                bot.send_message(sendperson, sendmessage)
+                msg.reply_text("Message sent")
         else:
             sendperson = sendperson[1:]
             personsql="select telegramid from user where username=%s" % sendperson
@@ -937,20 +928,20 @@ def send(bot, update, args):
                 item = row[0]
             # db2.commit()
             try:
-                bot.sendMessage(item, sendmessage)
-                bot.sendMessage(chat_id, "Message sent", reply_to_message_id=msgid)
+                bot.send_message(item, sendmessage)
+                msg.reply_text("Message sent", quote=True)
             except:
-                bot.sendMessage(chat_id, "Send Failed", reply_to_message_id=msgid)
+                msg.reply_text("Send Failed", quote=True)
     else:
         sendperson = to_user_id
         sendmessage = " ".join(args)
         if reply_to.forward_from is not None:
             sendperson = reply_to.forward_from.id
         try:
-            bot.sendMessage(sendperson, sendmessage)
-            bot.sendMessage(chat_id, "Message sent", reply_to_message_id=msgid)
+            bot.send_message(sendperson, sendmessage)
+            msg.reply_text("Message sent", quote=True)
         except:
-            bot.sendMessage(chat_id, "Send Failed", reply_to_message_id=msgid)
+            msg.reply_text("Send Failed", quote=True)
     cursor.close()
 
 
@@ -990,11 +981,12 @@ def escape_markdown(text):
 
 
 def save_message(bot, update):
-    reply_to_msg = update.message.reply_to_message
+    msg = update.message
+    reply_to_msg = msg.reply_to_message
     try:
-        reply_to_msg.forward(update.message.from_user.id)
+        reply_to_msg.forward(msg.from_user.id)
     except:
-        update.message.reply_text("You have not started me in private...")
+        msg.reply_text("You have not started me in private...")
 
 
 def main():
